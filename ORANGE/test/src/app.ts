@@ -25,8 +25,17 @@ function readDataFromFile() {
 let people: Person[] = readDataFromFile();
 
 app.get('/people', (req: Request, res: Response) => {
-  const peopleData = readDataFromFile();
   res.json(people);
+});
+
+app.get('/people/:id', (req: Request, res: Response) => {
+  const id = req.params.id;
+  const person = people.find(person => person.id === id);
+  if (person) {
+    res.json(person);
+  } else {
+    res.status(404).json({ error: 'Person not found' });
+  }
 });
 
 function writeDataToFile(data: Person[]): void {
@@ -63,12 +72,10 @@ app.delete('/people/:id', (req: Request, res: Response) => {
   }
 });
 
-app.put('/people/:id', (req: Request, res: Response) => {
-  const id = req.params.id;
-  const { nom, prenom, mail, phone } = req.body;
-  const index = people.findIndex(person => person.id === id);
+app.put('/people', (req: Request, res: Response) => {
+  const updatedPerson = req.body;
+  const index = people.findIndex(person => person.id === updatedPerson.id);
   if (index !== -1) {
-    const updatedPerson = new Person(nom, prenom, mail, phone, people[index].id);
     people[index] = updatedPerson;
     writeDataToFile(people);
     res.json(updatedPerson);
@@ -76,6 +83,8 @@ app.put('/people/:id', (req: Request, res: Response) => {
     res.status(404).json({ error: 'Person not found' });
   }
 });
+
+
 
 
 

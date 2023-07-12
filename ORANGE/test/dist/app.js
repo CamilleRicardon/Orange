@@ -25,8 +25,17 @@ function readDataFromFile() {
 }
 let people = readDataFromFile();
 app.get('/people', (req, res) => {
-    const peopleData = readDataFromFile();
     res.json(people);
+});
+app.get('/people/:id', (req, res) => {
+    const id = req.params.id;
+    const person = people.find(person => person.id === id);
+    if (person) {
+        res.json(person);
+    }
+    else {
+        res.status(404).json({ error: 'Person not found' });
+    }
 });
 function writeDataToFile(data) {
     try {
@@ -63,7 +72,7 @@ app.put('/people/:id', (req, res) => {
     const { nom, prenom, mail, phone } = req.body;
     const index = people.findIndex(person => person.id === id);
     if (index !== -1) {
-        const updatedPerson = new person_1.Person(nom, prenom, mail, phone, people[index].id);
+        const updatedPerson = new person_1.Person(nom, prenom, mail, phone, id); // Utilisez l'ID existant
         people[index] = updatedPerson;
         writeDataToFile(people);
         res.json(updatedPerson);

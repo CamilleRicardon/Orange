@@ -70,6 +70,12 @@ export default {
     this.fetchPeople();
   },
   methods: {
+    updatePersonIndex(updatedPerson) {
+    const index = this.people.findIndex(person => person.id === updatedPerson.id);
+    if (index !== -1) {
+    this.people.splice(index, 1, updatedPerson);
+    }
+  },
     fetchPeople() {
       axios.get('http://localhost:3000/people')
       .then(response => {
@@ -113,27 +119,26 @@ export default {
           console.error(error);
         });
     },
-    updatePerson()
-    {
-      const personId = this.editingPerson.id;
-      axios.put(`http://localhost:3000/people/${personId}`, this.editingPerson)
-      .then(response => {
-        const updatedPerson = response.data;
-        console.log('Personne mise à jour avec succès');
-        this.people = this.people.map(person => {
-          if (person.id === updatedPerson.id) {
-            return updatedPerson;
-          } else {
-            return person;
-          }
-      });
+    updatePerson() {
+  const personId = this.editingPerson.id;
+  const { nom, prenom, mail, phone } = this.editingPerson;
+  const updatedPersonData = { nom, prenom, mail, phone };
+
+  axios.put(`http://localhost:3000/people/${personId}`, updatedPersonData)
+    .then(response => {
+      const updatedPerson = response.data;
+      console.log('Personne mise à jour avec succès');
+      
+      this.updatePersonIndex(updatedPerson);
+
       this.editingPerson = null;
     })
     .catch(error => {
       console.error(error);
-    
     });
-  },
+},
+
+
   deletePerson(personId) {
   axios.delete(`http://localhost:3000/people/${personId}`)
     .then(() => {
