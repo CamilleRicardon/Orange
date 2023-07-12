@@ -116,9 +116,10 @@ export default {
     updatePerson()
     {
       const personId = this.editingPerson.id;
-      axios.put(`http://localhost:3000/people/${personId}`, this.editPerson)
+      axios.put(`http://localhost:3000/people/${personId}`, this.editingPerson)
       .then(response => {
         const updatedPerson = response.data;
+        console.log('Personne mise à jour avec succès');
         this.people = this.people.map(person => {
           if (person.id === updatedPerson.id) {
             return updatedPerson;
@@ -133,16 +134,22 @@ export default {
     
     });
   },
-    deletePerson(person) {
-      axios.delete(`http://localhost:3000/people/${personId}`)
-         .then(response => {
-           // Supprimer la personne de la liste des personnes affichées
-           this.people = this.people.filter(person => person.id !== personId);
-         })
-         .catch(error => {
-           console.error(error);
-         });
-    }
+  deletePerson(personId) {
+  axios.delete(`http://localhost:3000/people/${personId}`)
+    .then(() => {
+      // Recherche de l'index de la personne à supprimer
+      const index = this.people.findIndex(person => person.id === personId);
+      if (index !== -1) {
+        // Suppression de la personne de la liste
+        this.people.splice(index, 1);
+      }
+    })
+    .catch(error => {
+      console.error(error);
+    });
+}
+
+
   }
 };
 </script>
