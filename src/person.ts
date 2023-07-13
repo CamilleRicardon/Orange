@@ -1,14 +1,27 @@
+export function generateUniqueId(): string {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 7);
+    return `${timestamp}-${random}`;
+  }
+
 export class Person {
     private nom: string;
     private prenom: string;
     private mail: string;
     private phone: string;
-
-    constructor(nom: string, prenom: string, mail: string, phone: string) {
+    public id: string;
+    constructor(
+        nom: string,
+        prenom: string,
+        mail: string,
+        phone: string,
+        id?: string
+        ) {
         this.nom = nom;
         this.prenom = prenom;
         this.mail = mail;
         this.phone = phone;
+        this.id = generateUniqueId();
     }
 
     public getNom(): string {
@@ -34,6 +47,9 @@ export class Person {
     }
     public setPhone(phone: string): void {
         this.phone = phone;
+    }
+    public getId(): string {
+        return this.id;
     }
     
 }

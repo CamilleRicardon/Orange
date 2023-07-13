@@ -1,12 +1,19 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Person = void 0;
+exports.Person = exports.generateUniqueId = void 0;
+function generateUniqueId() {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 7);
+    return `${timestamp}-${random}`;
+}
+exports.generateUniqueId = generateUniqueId;
 class Person {
-    constructor(nom, prenom, mail, phone) {
+    constructor(nom, prenom, mail, phone, id) {
         this.nom = nom;
         this.prenom = prenom;
         this.mail = mail;
         this.phone = phone;
+        this.id = generateUniqueId();
     }
     getNom() {
         return this.nom;
@@ -31,6 +38,9 @@ class Person {
     }
     setPhone(phone) {
         this.phone = phone;
+    }
+    getId() {
+        return this.id;
     }
 }
 exports.Person = Person;
