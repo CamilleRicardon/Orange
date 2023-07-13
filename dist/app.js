@@ -67,12 +67,10 @@ app.delete('/people/:id', (req, res) => {
         res.status(404).json({ error: 'Person not found' });
     }
 });
-app.put('/people/:id', (req, res) => {
-    const id = req.params.id;
-    const { nom, prenom, mail, phone } = req.body;
-    const index = people.findIndex(person => person.id === id);
+app.put('/people', (req, res) => {
+    const updatedPerson = req.body;
+    const index = people.findIndex(person => person.id === updatedPerson.id);
     if (index !== -1) {
-        const updatedPerson = new person_1.Person(nom, prenom, mail, phone, id); // Utilisez l'ID existant
         people[index] = updatedPerson;
         writeDataToFile(people);
         res.json(updatedPerson);
