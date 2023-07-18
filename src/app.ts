@@ -12,7 +12,6 @@ app.use(cors());
 app.use(bodyParser.json());
 
 const port = 3000;
-//const mysql = require('mysql2');
 
 function readDataFromFile() {
   try {
@@ -44,7 +43,13 @@ connection.connect((error: QueryError | null) => {
 
 
 app.get('/people', (req: Request, res: Response) => {
-  const query = 'SELECT * FROM personnes';
+  const query = `
+    SELECT p.*, GROUP_CONCAT(j.nom) AS metiers 
+    FROM personnes p 
+    LEFT JOIN personnes_metiers pm ON p.id = pm.personne_id 
+    LEFT JOIN jobs j ON pm.metier_id = j.id 
+    GROUP BY p.id
+  `;
   connection.query(query, (error: QueryError | null, results: RowDataPacket[] | null) => {
     if (error) {
       console.error('Erreur lors de la récupération des personnes :', error);
@@ -54,6 +59,7 @@ app.get('/people', (req: Request, res: Response) => {
     }
   });
 });
+
 
 app.get('/people/:id', (req: Request, res: Response) => {
   const id = req.params.id;
@@ -66,6 +72,18 @@ app.get('/people/:id', (req: Request, res: Response) => {
       res.status(404).json({ error: 'Personne non trouvée' });
     } else {
       res.json(results[0]);
+    }
+  });
+});
+
+app.get('/jobs', (req: Request, res: Response) => {
+  const query = 'SELECT * FROM jobs';
+  connection.query(query, (error: QueryError | null, results: RowDataPacket[] | null) => {
+    if (error) {
+      console.error('Erreur lors de la récupération des métiers :', error);
+      res.status(500).json({ error: 'Erreur serveur' });
+    } else {
+      res.json(results);
     }
   });
 });
@@ -98,6 +116,22 @@ app.post('/people', (req: Request, res: Response) => {
     }
   });
 });
+
+app.post('/people/:personId/jobs/:jobId', (req: Request, res: Response) => {
+  const personId = req.params.personId;
+  const jobId = req.params.jobId;
+  const query = 'INSERT INTO personnes_metiers (personne_id, metier_id) VALUES (?, ?)';
+  const values = [personId, jobId];
+  connection.query(query, values, (error: QueryError | null, results: RowDataPacket[] & { insertId: number }) => {
+    if (error) {
+      console.error('Erreur lors de l\'association du métier à la personne :', error);
+      res.status(500).json({ error: 'Erreur serveur' });
+    } else {
+      res.status(201).json({ message: 'Métier associé à la personne avec succès' });
+    }
+  });
+});
+
 
 app.delete('/people/:id', (req: Request, res: Response) => {
   const id = req.params.id;
