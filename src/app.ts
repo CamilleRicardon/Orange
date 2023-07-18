@@ -1,17 +1,22 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import bodyParser from 'body-parser';
 import { Person } from './person';
 import { generateUniqueId } from './person';
 import { QueryError, RowDataPacket } from 'mysql2';
+import { TokenExpiredError } from 'jsonwebtoken';
 import cors from 'cors';
 import fs from 'fs';
 import mysql from 'mysql2';
+import jwt from 'jsonwebtoken';
 const app = express();
 
 app.use(cors());
 app.use(bodyParser.json());
 
 const port = 3000;
+
+const ADMIN_USERNAME = 'Camille';
+const ADMIN_PASSWORD = 'potat';
 
 function readDataFromFile() {
   try {
@@ -22,6 +27,46 @@ function readDataFromFile() {
     return [];
   
   }
+}
+
+function generateToken(userId: number): string {
+  const secretKey = 'potat';
+  const expiresIn = '1h';
+  const payload = { userId };
+
+  return jwt.sign(payload, secretKey, { expiresIn });
+}
+
+function authenticateToken(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.header('Authorization');
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({error: 'Token manquant ou invalide'})
+  }
+  const token = authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token manquant. Authentification requise.' });
+  }
+
+  console.log('Token reçu :', token); // Ajouter cette ligne pour voir le token reçu dans la console
+
+  const secretKey = 'potat';
+  jwt.verify(token, secretKey, (error, decoded) => {
+    if (error) {
+      console.log('Erreur de vérification du token :', error); // Ajouter cette ligne pour voir l'erreur dans la console
+
+      if (error instanceof TokenExpiredError) {
+        return res.status(401).json({ error: 'Token expiré. Veuillez vous reconnecter.' });
+      }
+      return res.status(403).json({ error: 'Token invalide.' });
+    }
+
+    console.log('Token décodé :', decoded); // Ajouter cette ligne pour voir le contenu du token décodé dans la console
+
+    req.userId = (decoded as { userId: number }).userId;
+    next();
+  });
 }
 
 const connection = mysql.createConnection({
@@ -41,8 +86,7 @@ connection.connect((error: QueryError | null) => {
   }
 });
 
-
-app.get('/people', (req: Request, res: Response) => {
+app.get('/people', authenticateToken, (req: Request, res: Response) => {
   const query = `
     SELECT p.*, GROUP_CONCAT(j.nom) AS jobs 
     FROM personnes p 
@@ -61,7 +105,7 @@ app.get('/people', (req: Request, res: Response) => {
 });
 
 
-app.get('/people/:id', (req: Request, res: Response) => {
+app.get('/people/:id', authenticateToken, (req: Request, res: Response) => {
   const id = req.params.id;
   const query = 'SELECT * FROM personnes WHERE id = ?';
   connection.query(query, [id], (error: QueryError | null, results: RowDataPacket[]) => {
@@ -76,7 +120,7 @@ app.get('/people/:id', (req: Request, res: Response) => {
   });
 });
 
-app.get('/jobs', (req: Request, res: Response) => {
+app.get('/jobs', authenticateToken, (req: Request, res: Response) => {
   const query = 'SELECT * FROM jobs';
   connection.query(query, (error: QueryError | null, results: RowDataPacket[] | null) => {
     if (error) {
@@ -102,7 +146,7 @@ function writeDataToFile(data: Person[]): void {
   }
 }
 
-app.post('/people', (req: Request, res: Response) => {
+app.post('/people', authenticateToken, (req: Request, res: Response) => {
   const { nom, prenom, mail, phone } = req.body;
   const query = 'INSERT INTO personnes (nom, prenom, mail, phone) VALUES (?, ?, ?, ?)';
   const values = [nom, prenom, mail, phone];
@@ -117,7 +161,7 @@ app.post('/people', (req: Request, res: Response) => {
   });
 });
 
-app.post('/people/:personId/jobs/:jobId', (req: Request, res: Response) => {
+app.post('/people/:personId/jobs/:jobId', authenticateToken, (req: Request, res: Response) => {
   const personId = req.params.personId;
   const jobId = req.params.jobId;
   const query = 'INSERT INTO personnes_jobs (personne_id, metier_id) VALUES (?, ?)';
@@ -132,8 +176,28 @@ app.post('/people/:personId/jobs/:jobId', (req: Request, res: Response) => {
   });
 });
 
+app.post('/login', (req: Request, res: Response) => {
+  const { username, password } = req.body;
 
-app.delete('/people/:id', (req: Request, res: Response) => {
+  // Vérifiez si les informations d'identification correspondent à celles de l'administrateur
+  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    // Générez le JWT avec un identifiant spécifique pour l'administrateur (par exemple, 999)
+    const adminId = 999; // Remplacez ceci par l'ID de l'administrateur
+    const token = generateToken(adminId);
+
+    // Renvoyez le JWT au client
+    res.json({ token });
+  } else {
+    // Si l'authentification échoue, renvoyez un message d'erreur approprié
+    res.status(401).json({ error: 'Identifiants invalides. Veuillez réessayer.' });
+  }
+});
+
+
+app.delete('/people/:id', authenticateToken, (req: Request, res: Response) => {
+  if (req.userId !== 999) {
+    return res.status(403).json({ error: 'Accès refusé. Vous n\'êtes pas autorisé à effectuer cette action.' });
+  } else {
   const id = req.params.id;
   const query = 'DELETE FROM personnes WHERE id = ?';
   connection.query(query, [id], (error: QueryError | null, results: RowDataPacket[] & { affectedRows: number }) => {
@@ -146,9 +210,10 @@ app.delete('/people/:id', (req: Request, res: Response) => {
       res.json({ message: 'Personne supprimée avec succès' });
     }
   });
+  }
 });
 
-app.put('/people', (req: Request, res: Response) => {
+app.put('/people', authenticateToken, (req: Request, res: Response) => {
   const { id, nom, prenom, mail, phone } = req.body;
   const query = 'UPDATE personnes SET nom = ?, prenom = ?, mail = ?, phone = ? WHERE id = ?';
   const values = [nom, prenom, mail, phone, id];
