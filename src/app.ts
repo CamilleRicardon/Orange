@@ -44,9 +44,9 @@ connection.connect((error: QueryError | null) => {
 
 app.get('/people', (req: Request, res: Response) => {
   const query = `
-    SELECT p.*, GROUP_CONCAT(j.nom) AS metiers 
+    SELECT p.*, GROUP_CONCAT(j.nom) AS jobs 
     FROM personnes p 
-    LEFT JOIN personnes_metiers pm ON p.id = pm.personne_id 
+    LEFT JOIN personnes_jobs pm ON p.id = pm.personne_id 
     LEFT JOIN jobs j ON pm.metier_id = j.id 
     GROUP BY p.id
   `;
@@ -120,7 +120,7 @@ app.post('/people', (req: Request, res: Response) => {
 app.post('/people/:personId/jobs/:jobId', (req: Request, res: Response) => {
   const personId = req.params.personId;
   const jobId = req.params.jobId;
-  const query = 'INSERT INTO personnes_metiers (personne_id, metier_id) VALUES (?, ?)';
+  const query = 'INSERT INTO personnes_jobs (personne_id, metier_id) VALUES (?, ?)';
   const values = [personId, jobId];
   connection.query(query, values, (error: QueryError | null, results: RowDataPacket[] & { insertId: number }) => {
     if (error) {
