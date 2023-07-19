@@ -8,6 +8,9 @@ import cors from 'cors';
 import fs from 'fs';
 import mysql from 'mysql2';
 import jwt from 'jsonwebtoken';
+
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocument = require('../swaggerConfig');
 const app = express();
 
 app.use(cors());
@@ -86,6 +89,19 @@ connection.connect((error: QueryError | null) => {
   }
 });
 
+/**
+ * @swagger
+ * /people:
+ *   get:
+ *     summary: Récupère la liste des personnes
+ *     description: Récupère la liste de toutes les personnes de la base de données.
+ *     responses:
+ *       200:
+ *         description: Succès. Renvoie la liste des personnes.
+ *       500:
+ *         description: Erreur serveur.
+ */
+
 app.get('/people', authenticateToken, (req: Request, res: Response) => {
   const query = `
     SELECT p.*, GROUP_CONCAT(j.nom) AS jobs 
@@ -104,7 +120,27 @@ app.get('/people', authenticateToken, (req: Request, res: Response) => {
   });
 });
 
-
+/**
+ * @swagger
+ * /people/{id}:
+ *   get:
+ *     summary: Récupère une personne par son ID
+ *     description: Récupère une personne à partir de son ID.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la personne à récupérer.
+ *     responses:
+ *       200:
+ *         description: Succès. Renvoie les informations de la personne.
+ *       404:
+ *         description: Personne non trouvée.
+ *       500:
+ *         description: Erreur serveur.
+ */
 app.get('/people/:id', authenticateToken, (req: Request, res: Response) => {
   const id = req.params.id;
   const query = 'SELECT * FROM personnes WHERE id = ?';
@@ -120,6 +156,18 @@ app.get('/people/:id', authenticateToken, (req: Request, res: Response) => {
   });
 });
 
+/**
+ * @swagger
+ * /jobs:
+ *   get:
+ *     summary: Récupère la liste des métiers
+ *     description: Récupère la liste de tous les métiers de la base de données.
+ *     responses:
+ *       200:
+ *         description: Succès. Renvoie la liste des métiers.
+ *       500:
+ *         description: Erreur serveur.
+ */
 app.get('/jobs', authenticateToken, (req: Request, res: Response) => {
   const query = 'SELECT * FROM jobs';
   connection.query(query, (error: QueryError | null, results: RowDataPacket[] | null) => {
@@ -146,6 +194,45 @@ function writeDataToFile(data: Person[]): void {
   }
 }
 
+/**
+ * @swagger
+ * /people:
+ *   post:
+ *     summary: Ajoute une nouvelle personne
+ *     description: Ajoute une nouvelle personne à la base de données.
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Token d'authentification (doit être fourni dans le header).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nom:
+ *                 type: string
+ *               prenom:
+ *                 type: string
+ *               mail:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *             example:
+ *               nom: Doe
+ *               prenom: John
+ *               mail: john.doe@example.com
+ *               phone: +1234567890
+ *     responses:
+ *       201:
+ *         description: Succès. Renvoie les informations de la personne ajoutée.
+ *       500:
+ *         description: Erreur serveur.
+ */
 app.post('/people', authenticateToken, (req: Request, res: Response) => {
   const { nom, prenom, mail, phone } = req.body;
   const query = 'INSERT INTO personnes (nom, prenom, mail, phone) VALUES (?, ?, ?, ?)';
@@ -161,6 +248,38 @@ app.post('/people', authenticateToken, (req: Request, res: Response) => {
   });
 });
 
+
+/**
+ * @swagger
+ * /people/{personId}/jobs/{jobId}:
+ *   post:
+ *     summary: Associe un métier à une personne
+ *     description: Associe un métier à une personne dans la base de données.
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Token d'authentification (doit être fourni dans le header).
+ *       - in: path
+ *         name: personId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la personne à associer au métier.
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du métier à associer à la personne.
+ *     responses:
+ *       201:
+ *         description: Succès. Le métier a été associé à la personne avec succès.
+ *       500:
+ *         description: Erreur serveur.
+ */
 app.post('/people/:personId/jobs/:jobId', authenticateToken, (req: Request, res: Response) => {
   const personId = req.params.personId;
   const jobId = req.params.jobId;
@@ -176,24 +295,70 @@ app.post('/people/:personId/jobs/:jobId', authenticateToken, (req: Request, res:
   });
 });
 
+/**
+ * @swagger
+ * /login:
+ *   post:
+ *     summary: Connexion en tant qu'administrateur
+ *     description: Connectez-vous en tant qu'administrateur pour obtenir un token d'authentification.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *             example:
+ *               username: Camille
+ *               password: potat
+ *     responses:
+ *       200:
+ *         description: Succès. Renvoie un token d'authentification.
+ *       401:
+ *         description: Identifiants invalides. Veuillez réessayer.
+ */
 app.post('/login', (req: Request, res: Response) => {
   const { username, password } = req.body;
-
-  // Vérifiez si les informations d'identification correspondent à celles de l'administrateur
   if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-    // Générez le JWT avec un identifiant spécifique pour l'administrateur (par exemple, 999)
-    const adminId = 999; // Remplacez ceci par l'ID de l'administrateur
+    const adminId = 999;
     const token = generateToken(adminId);
-
-    // Renvoyez le JWT au client
     res.json({ token });
   } else {
-    // Si l'authentification échoue, renvoyez un message d'erreur approprié
     res.status(401).json({ error: 'Identifiants invalides. Veuillez réessayer.' });
   }
 });
 
-
+/**
+ * @swagger
+ * /people/{id}:
+ *   delete:
+ *     summary: Supprime une personne
+ *     description: Supprime une personne de la base de données.
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Token d'authentification (doit être fourni dans le header).
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la personne à supprimer.
+ *     responses:
+ *       200:
+ *         description: Succès. La personne a été supprimée avec succès.
+ *       404:
+ *         description: Personne non trouvée.
+ *       500:
+ *         description: Erreur serveur.
+ */
 app.delete('/people/:id', authenticateToken, (req: Request, res: Response) => {
   if (req.userId !== 999) {
     return res.status(403).json({ error: 'Accès refusé. Vous n\'êtes pas autorisé à effectuer cette action.' });
@@ -213,6 +378,50 @@ app.delete('/people/:id', authenticateToken, (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /people:
+ *   put:
+ *     summary: Met à jour une personne
+ *     description: Met à jour les informations d'une personne dans la base de données.
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Token d'authentification (doit être fourni dans le header).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: integer
+ *               nom:
+ *                 type: string
+ *               prenom:
+ *                 type: string
+ *               mail:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *             example:
+ *               id: 1
+ *               nom: Doe
+ *               prenom: John
+ *               mail: john.doe@example.com
+ *               phone: +1234567890
+ *     responses:
+ *       200:
+ *         description: Succès. Les informations de la personne ont été mises à jour avec succès.
+ *       404:
+ *         description: Personne non trouvée.
+ *       500:
+ *         description: Erreur serveur.
+ */
 app.put('/people', authenticateToken, (req: Request, res: Response) => {
   const { id, nom, prenom, mail, phone } = req.body;
   const query = 'UPDATE personnes SET nom = ?, prenom = ?, mail = ?, phone = ? WHERE id = ?';
@@ -228,6 +437,8 @@ app.put('/people', authenticateToken, (req: Request, res: Response) => {
     }
   });
 });
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
